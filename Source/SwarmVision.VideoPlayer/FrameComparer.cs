@@ -1,4 +1,5 @@
-﻿using System.Threading;
+﻿using System.Linq;
+using System.Threading;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -176,6 +177,8 @@ namespace SwarmVision.VideoPlayer
             var stopwatch = new Stopwatch();
             stopwatch.Start();
 
+            var targetColor = Color.FromArgb(199, 97, 61);
+
             var result = new FrameComparerResults()
                 {
                     Threshold = Threshold
@@ -189,12 +192,14 @@ namespace SwarmVision.VideoPlayer
             var height = bitmapA.Height;
             var width = bitmapA.Width;
             var stride = bitmapA.Stride;
-            var changedPixelsCount = 0;
             var xMin = (int) (width*LeftBountPCT);
             var xMax = (int) (width*RightBountPCT);
             var yMin = (int) (height*TopBountPCT);
-            ;
             var yMax = (int) (height*BottomBountPCT);
+            var targetColorR = targetColor.R;
+            var targetColorG = targetColor.G;
+            var targetColorB = targetColor.B;
+            var changedPixelsCount = 0;
 
             //Do each row in parallel
             Parallel.For(yMin, yMax, new ParallelOptions() {/*MaxDegreeOfParallelism = 1*/}, (int y) =>
@@ -206,18 +211,31 @@ namespace SwarmVision.VideoPlayer
                         var offset = x*3 + rowStart;
 
                         var colorDifference =
-                            Math.Abs(aFirstPx[offset + 0] - bFirstPx[offset + 0]) +
-                            Math.Abs(aFirstPx[offset + 1] - bFirstPx[offset + 1]) +
-                            Math.Abs(aFirstPx[offset + 2] - bFirstPx[offset + 2]);
+                            Math.Abs(aFirstPx[offset + 0] - targetColorB) +
+                            Math.Abs(aFirstPx[offset + 1] - targetColorG) +
+                            Math.Abs(aFirstPx[offset + 2] - targetColorR);
 
-                        if (colorDifference > efficientTreshold)
+                        if (colorDifference < efficientTreshold)
                         {
-                            changedPixelsCount++;
+                            //changedPixelsCount++;
                             changedPixels.Add(new Point(x, y));
                         }
                     }
                 });
 
+            var foundPix = changedPixels.Count;
+
+            if (foundPix > 2)
+                changedPixelsCount = (int) changedPixels
+                    .OrderBy(p => p.Y)
+                    .Skip((int) (foundPix * 0.1))
+                    .Take((int) (foundPix * 0.8))
+                    .Average(p => p.Y);
+
+            else if(foundPix > 0)
+                changedPixelsCount = (int)changedPixels.Average(p => p.Y);
+
+            
             result.ChangedPixelsCount = changedPixelsCount;
             result.ChangedPixels = changedPixels;
             result.FrameIndex = bitmapB.FrameIndex;
@@ -225,6 +243,8 @@ namespace SwarmVision.VideoPlayer
 
             return result;
         }
+
+
 
         public void SetBounds(double leftPercent, double topPercent, double rightPercent, double bottomPercent)
         {
