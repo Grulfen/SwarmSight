@@ -101,6 +101,7 @@ namespace SwarmVision.VideoPlayer
                 Debug.Print(new string('D', FrameBuffer.Count));
 
                 bmpBufferIndex = 0;
+                count = 0;
 
                 if (FrameReady != null)
                     FrameReady(this, new OnFrameReady() {Frame = frame});
