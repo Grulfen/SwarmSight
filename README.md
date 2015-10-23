@@ -17,7 +17,7 @@ Have videos with a control and treatment group? Load their motion activity files
 
 ##Motion Comparison Statistics
 
-Need to know if the motion between two videos is different in a statistically significant way? Just load the video motion data and click "Compute Statistics". You'll get a the results of a tow-tailed T-Test, including the p-value, and its *** significance. Will also show a chart of the two videos with error bars showing the 0.05 significance thresholds.
+Need to know if the motion between two videos is different in a statistically significant way? Just load the video motion data and click "Compute Statistics". You'll get a the results of a two-tailed T-Test, including the p-value, and its *** significance. Will also show a chart of the two videos with error bars showing the 0.05 significance thresholds.
 
 ![SwarmVision Statistics](https://raw.githubusercontent.com/justasb/SwarmVision/master/Screenshots/Stats.JPG)
 
