@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Drawing;
 using System.Threading.Tasks;
+using System.Windows;
 using Classes;
 
 namespace SwarmVision.VideoPlayer
@@ -12,27 +13,29 @@ namespace SwarmVision.VideoPlayer
     {
         public static List<long> PerformanceHistory = new List<long>(1000);
 
+        public bool ShowMotion = true;
+        public int ShadeRadius = 1;
+
         public int Threshold = 50;
         public int MostRecentFrameIndex = -1; //Always resumes one frame ahead
 
         public VideoDecoder Decoder;
-        public FrameRenderer Renderer;
         public EventHandler<FrameComparisonArgs> FrameCompared;
         public EventHandler<EventArgs> Stopped;
 
         private Frame _previousFrame;
-        public bool IsPaused;
+        public bool IsPlaying;
         private Thread _bufferMonitor;
 
         private double LeftBountPCT;
         private double RightBountPCT;
         private double TopBountPCT;
         private double BottomBountPCT;
+        private PixelShader _shader = new PixelShader();
 
-        public FrameComparer(VideoDecoder decoder, FrameRenderer renderer)
+        public FrameComparer(VideoDecoder decoder)
         {
             Decoder = decoder;
-            Renderer = renderer;
         }
 
         public void Start()
@@ -46,24 +49,24 @@ namespace SwarmVision.VideoPlayer
             _bufferMonitor = new Thread(CompareFramesInBuffer) {IsBackground = true};
             _bufferMonitor.Start();
 
-            //Start decoder & renderer
+            //Start decoder
             Decoder.Start();
-            Renderer.Start();
+
+            IsPlaying = true;
         }
 
         public void Pause(bool stopSelf = true)
         {
-            //stop decoding, comparing, rendering
+            //stop decoding, comparing
             Decoder.Stop();
 
             if (stopSelf)
                 StopComparing();
 
-            Renderer.Stop();
-
             //Cleanup buffers
             Decoder.ClearBuffer();
-            Renderer.ClearBuffer();
+
+            IsPlaying = false;
         }
 
         public void SeekTo(double percentLocation)
@@ -96,6 +99,7 @@ namespace SwarmVision.VideoPlayer
         private void Reset()
         {
             MostRecentFrameIndex = -1;
+            IsPlaying = false;
 
             if (_previousFrame != null)
             {
@@ -109,65 +113,82 @@ namespace SwarmVision.VideoPlayer
         /// </summary>
         private void CompareFramesInBuffer()
         {
-            while (true)
+            try
             {
-                if (Decoder.IsBufferReady &&
-                    Decoder.FramesInBuffer &&
-                    Decoder.FrameBuffer.First.Value.IsDecoded)
+                while (true)
                 {
-                    var currentFrame = Decoder.FrameBuffer.First.Value;
-
-                    if (!currentFrame.IsDecoded)
-                        continue;
-
-                    if (_previousFrame != null)
+                    if (Decoder.IsBufferReady &&
+                        Decoder.FramesInBuffer &&
+                        Decoder.FrameBuffer.First.Value.IsDecoded)
                     {
-                        var compareResult = Compare(currentFrame, _previousFrame);
+                        var currentFrame = Decoder.FrameBuffer.First.Value;
 
-                        //Notify of comparison results
-                        if (FrameCompared != null)
-                            FrameCompared(this, new FrameComparisonArgs() {Results = compareResult});
+                        if (!currentFrame.IsDecoded)
+                            continue;
 
-                        //Set a limit on how many frames behind to render
-                        if (Renderer.Queue.Count < 10)
+                        if (_previousFrame != null)
                         {
-                            currentFrame.Watch.Stop();
+                            var compareResult = Compare(currentFrame, _previousFrame);
 
-                            //Add a cloned frame to rendering queue
-                            Renderer.Queue.AddLast(new ComparedFrame()
-                                {
-                                    Frame = currentFrame.Clone(),
-                                    ComparerResults = compareResult,
-                                });
+                            //Shade if motion is visible
+                            if (ShowMotion)
+                            {
+                                var shadedFramed = currentFrame.Clone();
 
-                            Debug.Print(new string('R', Renderer.Queue.Count));
+                                _shader.Shade
+                                    (
+                                        shadedFramed,
+                                        compareResult.ChangedPixels,
+                                        ShadeRadius
+                                    );
+
+                                compareResult.Frame = shadedFramed;
+                            }
+                            else
+                            {
+                                compareResult.Frame = currentFrame;
+                            }
+
+                            //Notify of comparison results
+                            if (FrameCompared != null)
+                                FrameCompared(this, new FrameComparisonArgs() {Results = compareResult});
+
+                            _previousFrame.Dispose();
                         }
 
-                        _previousFrame.Dispose();
+                        //Retain location
+                        MostRecentFrameIndex = currentFrame.FrameIndex;
+
+                        _previousFrame = currentFrame;
+                        Decoder.FrameBuffer.Remove(currentFrame);
                     }
+                    else if (Decoder.AtEndOfVideo)
+                    {
+                        Pause(false);
 
-                    //Retain location
-                    MostRecentFrameIndex = currentFrame.FrameIndex;
+                        if (Stopped != null)
+                            Stopped(this, null);
 
-                    _previousFrame = currentFrame;
-                    Decoder.FrameBuffer.Remove(currentFrame);
+                        Reset();
+
+                        //If no more frames and at the end, stop processing
+                        return;
+                    }
+                    else
+                    {
+                        Thread.Sleep(5);
+                    }
                 }
-                else if (Decoder.AtEndOfVideo)
-                {
-                    Pause(false);
+            }
+            catch (ThreadAbortException)
+            {
+                
+            }
+            catch (Exception e)
+            {
+                MessageBox.Show("Sorry, there was a problem playing the video. Error message: " + e.Message);
 
-                    if (Stopped != null)
-                        Stopped(this, null);
-
-                    Reset();
-
-                    //If no more frames and at the end, stop processing
-                    return;
-                }
-                else
-                {
-                    Thread.Sleep(5);
-                }
+                Pause();
             }
         }
 
