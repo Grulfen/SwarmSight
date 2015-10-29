@@ -153,6 +153,9 @@ namespace SwarmVision.VideoPlayer
                             if (FrameCompared != null)
                                 FrameCompared(this, new FrameComparisonArgs() {Results = compareResult});
 
+                            if(ShowMotion)
+                                compareResult.Frame.Dispose();
+
                             _previousFrame.Dispose();
                         }
 

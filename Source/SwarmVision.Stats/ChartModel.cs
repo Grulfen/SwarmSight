@@ -83,7 +83,7 @@ namespace SwarmVision.Stats
                     {
                         while (KeepRefreshing)
                         {
-                            Thread.Sleep(150);
+                            Thread.Sleep(500);
 
                             MyModel.InvalidatePlot(true);
                         }
