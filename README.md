@@ -1,5 +1,5 @@
 # SwarmVision
-SwarmVision is a video motion analysis tool to assess the aggregate movement or activity levels of groups or swarms of animals. It is used by behavioral scientists to study the behavior of insects, birds, fish, and other animals. It's free, open-source, and runs on Windows.
+SwarmVision is an open-source video motion analysis tool to assess the aggregate movement or activity levels of groups or swarms of animals. It is used by behavioral scientists to study the behavior of insects, birds, fish, and other animals. It's free, open-source, and runs on Windows.
 
 ##Analyze Video Motion
 
