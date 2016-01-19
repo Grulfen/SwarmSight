@@ -27,6 +27,10 @@ To compare two videos, load the saved video motion data, select the frames to co
 2. Unzip the downloaded file
 3. Install by clicking setup.exe
 
+#Educational Materials and Examples
+
+A sample video with example analysis and a presentation with examples of how the activity data could be used is located in the [Examples folder](Examples)
+
 #Problems
 If you run into problems, please [report them as issues](https://github.com/justasb/SwarmSight/issues).
 
