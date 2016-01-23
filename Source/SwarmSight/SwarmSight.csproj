@@ -27,7 +27,7 @@
     <UpdatePeriodically>false</UpdatePeriodically>
     <UpdateRequired>false</UpdateRequired>
     <MapFileExtensions>false</MapFileExtensions>
-    <UpdateUrl>https://github.com/JustasB/SwarmSight/blob/master/Setup/</UpdateUrl>
+    <UpdateUrl>https://raw.githubusercontent.com/JustasB/SwarmSight/master/Setup/</UpdateUrl>
     <ProductName>SwarmSight</ProductName>
     <PublisherName>Justas Birgiolas</PublisherName>
     <WebPage>publish.htm</WebPage>
