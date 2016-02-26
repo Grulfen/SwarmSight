@@ -9,6 +9,8 @@ SwarmSight provides frame-by-frame motion data from any video. Vary the sensitiv
 
 Motion of fast-moving [stingless bees](https://en.wikipedia.org/wiki/Tetragonisca_angustula) shown in yellow & blue.
 
+[![Watch SwarmSight Perform Bee Swarm Motion Analysis](https://raw.githubusercontent.com/justasb/SwarmSight/master/Screenshots/Screen.Shot.2016-02-26.at.12.32.59.PM.png)](https://www.youtube.com/watch?v=YAQ1Dp97Q_M)
+
 ##Compare Motion
 
 Have videos with a control and treatment group? Load their motion activity files and compare the two. SwarmSight will also compare parts of the same video. Just load it twice and pick different times in the video to compare.
