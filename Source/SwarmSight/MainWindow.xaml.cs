@@ -13,9 +13,13 @@ using System.IO;
 using System.Threading;
 using System.Windows;
 using System.Windows.Media.Imaging;
+using SwarmSight.Filters;
 using SwarmSight.UserControls;
-using Frame = SwarmSight.VideoPlayer.Frame;
+using Frame = SwarmSight.Filters.Frame;
 using Point = System.Windows.Point;
+using System.Windows.Input;
+using System.Windows.Media;
+using SwarmSight.MotionTracking;
 
 namespace SwarmSight
 {
@@ -28,7 +32,7 @@ namespace SwarmSight
         private const string PauseSymbol = ";";
 
         private double _fullSizeWidth;
-        private double _quality = 0.25;
+        private double _quality = 1;
         private List<Point> _activity = new List<Point>();
         private int _fpsStartFrame;
         private Stopwatch _fpsStopwatch = new Stopwatch();
@@ -36,13 +40,15 @@ namespace SwarmSight
         private ChartModel _chart;
         private VideoDecoder _decoder;
         private FrameComparer _comparer;
+        private FrameRenderer _renderer;
+        private readonly VideoProcessorBase _processor = new MotionDetector();
 
         public MainWindow()
         {
             InitializeComponent();
 
             _fullSizeWidth = Width;
-            
+
             ToggleCompare();
             SetupChart();
             SetupPlayer();
@@ -51,6 +57,11 @@ namespace SwarmSight
             Closing += (sender, args) => Stop();
 
             Application.Current.Exit += (sender, args) => Stop();
+
+#if !DEBUG
+            AppDomain.CurrentDomain.UnhandledException +=
+                (sender, args) => { MessageBox.Show((args.ExceptionObject as Exception).Message); };
+#endif
         }
 
         private void SetupChart()
@@ -59,11 +70,11 @@ namespace SwarmSight
             _activity = new List<Point>(100);
 
             chartPlaceholder.Children.Add(new PlotView()
-                {
-                    Model = _chart.MyModel,
-                    Width = chartPlaceholder.Width,
-                    Height = chartPlaceholder.Height,
-                });
+            {
+                Model = _chart.MyModel,
+                Width = chartPlaceholder.Width,
+                Height = chartPlaceholder.Height,
+            });
 
             chartA.UseCurrentClicked += OnUseCurrentClicked;
             chartB.UseCurrentClicked += OnUseCurrentClicked;
@@ -71,7 +82,7 @@ namespace SwarmSight
 
         private void OnUseCurrentClicked(object sender, EventArgs e)
         {
-            ((VideoActivityChart) sender).AddPointsToChart(_activity);
+            ((VideoActivityChart)sender).AddPointsToChart(_activity);
 
             ComputeComparisonStats();
         }
@@ -119,9 +130,12 @@ namespace SwarmSight
         private void SetupPlayer()
         {
             _decoder = new VideoDecoder();
-            _comparer = new FrameComparer(_decoder);
+            _renderer = new FrameRenderer();
+            _comparer = new FrameComparer(_decoder, _renderer);
 
+            _decoder.Processor = _comparer.Processor = _processor;
             _comparer.FrameCompared += OnFrameCompared;
+            _renderer.FrameReady += OnFrameReadyToRender;
             _comparer.Stopped += OnStopped;
 
             roi.RegionChanged += (sender, args) => UpdateComparerBounds();
@@ -152,58 +166,67 @@ namespace SwarmSight
 
         private void Play()
         {
-            try
+            //Play
+            if (btnPlayPause.Content.ToString() == PlaySymbol)
             {
-                //Play
-                if (btnPlayPause.Content.ToString() == PlaySymbol)
+                if (!File.Exists(txtFileName.Text))
                 {
-                    //Reset decoder
-                    if (_decoder != null)
-                    {
-                        _decoder.Dispose();
-                        _decoder = null;
-                        _decoder = new VideoDecoder();
-                        _decoder.Open(txtFileName.Text);
-                        _comparer.Decoder = _decoder;
-                    }
-
-                    //Can't change quality if playing
-                    sliderQuality.IsEnabled = false;
-
-                    //Clear chart points after the current position
-                    _chart.ClearAfter(_comparer.MostRecentFrameIndex);
-                    _activity.RemoveAll(p => p.X > _comparer.MostRecentFrameIndex);
-
-                    //Adjust for any quality changes, before starting again
-                    _decoder.PlayerOutputWidth = (int) (_decoder.VideoInfo.Width*_quality);
-                    _decoder.PlayerOutputHeight = (int) (_decoder.VideoInfo.Height*_quality);
-
-                    //Setup fps counter
-                    _fpsStartFrame = _comparer.MostRecentFrameIndex;
-                    _fpsStopwatch.Restart();
-
-                    //Play or resume
-                    _comparer.Start();
-
-                    btnPlayPause.Content = PauseSymbol;
+                    MessageBox.Show("Please select a video file.");
+                    return;
                 }
-                else //Pause
+
+                //Reset decoder
+                if (_decoder != null)
                 {
-                    btnPlayPause.Content = PlaySymbol;
-                    _comparer.Pause();
-                    sliderQuality.IsEnabled = true;
+                    _decoder.Dispose();
+                    _decoder = null;
+                    _decoder = new VideoDecoder();
+                    _decoder.PlayStartTimeInSec = 0;
+                    _decoder.Processor = _processor;
+                    _decoder.Open(txtFileName.Text);
+                    _comparer.Decoder = _decoder;
                 }
+
+                //Clear canvas buffer
+                canvasBuffer = null;
+
+                //Can't change quality if playing
+                sliderQuality.IsEnabled = false;
+
+                //Clear chart points after the current position
+                _chart.ClearAfter(_comparer.MostRecentFrameIndex);
+                _activity.RemoveAll(p => p.X > _comparer.MostRecentFrameIndex);
+
+                //Adjust for any quality changes, before starting again
+                _decoder.PlayerOutputWidth = (int)(_decoder.VideoInfo.Width * _quality); //204;//
+                _decoder.PlayerOutputHeight = (int)(_decoder.VideoInfo.Height * _quality); //152;//
+
+                //Setup fps counter
+                _fpsStartFrame = _comparer.MostRecentFrameIndex;
+                _fpsStopwatch.Restart();
+
+                //Play or resume
+                _comparer.Start();
+
+                btnPlayPause.Content = PauseSymbol;
             }
-            catch (Exception e)
+            else //Pause
             {
-                MessageBox.Show("Sorry, there was a problem playing the video. Error message: " + e.Message);
-                Stop();
+                Pause();
             }
+        }
+
+        private void Pause()
+        {
+            btnPlayPause.Content = PlaySymbol;
+            _comparer.Pause();
+            sliderQuality.IsEnabled = true;
         }
 
         private void Stop()
         {
             _comparer.Stop();
+            _renderer.Stop();
             Reset();
         }
 
@@ -214,12 +237,12 @@ namespace SwarmSight
 
             _comparer.SeekTo(percentLocation);
 
-            lblTime.Content = TimeSpan.FromMilliseconds(_decoder.VideoInfo.Duration.TotalMilliseconds*percentLocation).ToString();
+            lblTime.Content = TimeSpan.FromMilliseconds(_decoder.VideoInfo.Duration.TotalMilliseconds * percentLocation).ToString();
         }
 
         private void OnFrameCompared(object sender, FrameComparisonArgs e)
         {
-            if (Application.Current == null)
+            if (e.Results == null || Application.Current == null)
                 return;
 
             Application.Current.Dispatcher.Invoke(() =>
@@ -234,9 +257,6 @@ namespace SwarmSight
 
                 _activity.Add(new Point(e.Results.FrameIndex, e.Results.ChangedPixelsCount));
                 lblChangedPixels.Content = string.Format("Changed Pixels: {0:n0}", e.Results.ChangedPixelsCount);
-                lblTime.Content = e.Results.FrameTime.ToString();
-
-                ShowFrame(e.Results.Frame);
             });
         }
 
@@ -247,41 +267,54 @@ namespace SwarmSight
             Reset();
         }
 
-        public static LinkedList<double> FpsHistory = new LinkedList<double>(); 
+        public static LinkedList<DateTime> fpsHist = new LinkedList<DateTime>();
+        private static bool isDrawing = false;
+        private static WriteableBitmap canvasBuffer;
+        private static DateTime prevFrameTime = DateTime.Now;
         private void ShowFrame(Frame frame)
         {
+            if (isDrawing)
+                return;
+
             if (Application.Current == null)
                 return;
 
             Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                if (Application.Current == null)
+                    return;
+
+                isDrawing = true;
+
+                //Create WriteableBitmap the first time
+                if (canvasBuffer == null)
                 {
-                    if (Application.Current == null)
-                        return;
+                    canvasBuffer = new WriteableBitmap(frame.Width, frame.Height, 96, 96, PixelFormats.Bgr24, null);
+                    videoCanvas.Source = canvasBuffer;
+                }
 
-                    using (var memory = new MemoryStream())
-                    {
-                        frame.Bitmap.Save(memory, ImageFormat.Bmp);
-                        memory.Position = 0;
-                        var bitmapImage = new BitmapImage();
-                        bitmapImage.BeginInit();
-                        bitmapImage.StreamSource = memory;
-                        bitmapImage.CacheOption = BitmapCacheOption.OnLoad;
-                        bitmapImage.EndInit();
+                if ((DateTime.Now - prevFrameTime).TotalMilliseconds >= 1000 / 30.0)
+                {
+                    frame.CopyToWriteableBitmap(canvasBuffer);
+                    prevFrameTime = DateTime.Now;
+                }
 
-                        videoCanvas.Source = bitmapImage;
-                    }
+                _sliderValueChangedByCode = true;
+                sliderTime.Value = frame.FramePercentage * 1000;
+                lblTime.Content = frame.FrameTime.ToString();
 
-                    _sliderValueChangedByCode = true;
-                    sliderTime.Value = frame.FramePercentage*1000;
+                //Compute FPS
+                var now = DateTime.Now;
+                fpsHist.AddLast(now);
+                lblFPS.Content = string.Format("FPS: {0:n1}", fpsHist.Count / 1.0);
 
-                    FpsHistory.AddLast(frame.Watch.Elapsed.TotalMilliseconds);
+                while ((now - fpsHist.First()).TotalMilliseconds > 1000)
+                {
+                    fpsHist.RemoveFirst();
+                }
 
-                    if(FpsHistory.Count > 100)
-                        FpsHistory.RemoveFirst();
-
-                    //Compute FPS
-                    lblFPS.Content = string.Format("FPS: {0:n1}", 1000 / FpsHistory.Average());
-                }));
+                isDrawing = false;
+            }));
         }
 
         private void ToggleCompare()
@@ -306,8 +339,13 @@ namespace SwarmSight
             double screenHeight = System.Windows.SystemParameters.PrimaryScreenHeight;
             double windowWidth = this.Width;
             double windowHeight = this.Height;
-            this.Left = (screenWidth/2) - (windowWidth/2);
-            this.Top = (screenHeight/2) - (windowHeight/2);
+            this.Left = (screenWidth / 2) - (windowWidth / 2);
+            this.Top = (screenHeight / 2) - (windowHeight / 2);
+        }
+
+        private void OnFrameReadyToRender(object sender, OnFrameReady e)
+        {
+            ShowFrame(e.Frame);
         }
 
         private void Reset()
@@ -348,21 +386,15 @@ namespace SwarmSight
 
         private void thresholdSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_comparer != null)
-                _comparer.Threshold = (int) e.NewValue;
+            if (_processor != null)
+                ((MotionDetector)_processor).Threshold = (int)e.NewValue;
 
             if (lblThreshold != null)
-                lblThreshold.Content = _comparer.Threshold;
+                lblThreshold.Content = ((MotionDetector)_processor).Threshold;
         }
 
         private void OnPlayClicked(object sender, RoutedEventArgs e)
         {
-            if (string.IsNullOrWhiteSpace(txtFileName.Text))
-            {
-                MessageBox.Show("Please select a video file.");
-                return;
-            }
-
             Play();
         }
 
@@ -373,29 +405,20 @@ namespace SwarmSight
 
         private void chkShowMotion_Click(object sender, RoutedEventArgs e)
         {
-            _comparer.ShowMotion = sliderContrast.IsEnabled = chkShowMotion.IsChecked.Value;
+            _renderer.ShowMotion = sliderContrast.IsEnabled = chkShowMotion.IsChecked.Value;
         }
 
 
+        private void sliderTime_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            //Pause if slider is clicked
+            if (!_comparer.IsPaused)
+                Pause();
+        }
 
         private void sliderTime_PreviewMouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
         {
             sliderTime_MouseDown(sender, e);
-        }
-
-
-        private void sliderTime_PreviewMouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            sliderTime_MouseUp(sender, e);
-        }
-
-        private void sliderTime_MouseDown(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            wasPlaying = _comparer.IsPlaying;
-
-            //Pause if slider is clicked
-            if (_comparer.IsPlaying)
-                Play(); //Pause
         }
 
         private bool _sliderValueChangedByCode;
@@ -408,14 +431,10 @@ namespace SwarmSight
                 return;
             }
 
-            SeekTo(sliderTime.Value / 1000.0);
-        }
+            if (btnPlayPause.Content.ToString() == PlaySymbol)
+                Pause();
 
-        private bool wasPlaying = false;
-        private void sliderTime_MouseUp(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            if(wasPlaying)
-                Play();
+            SeekTo(e.NewValue / 1000.0);
         }
 
         private void btnShowCompare_Click(object sender, RoutedEventArgs e)
@@ -425,28 +444,29 @@ namespace SwarmSight
 
         private void sliderQuality_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            _quality = e.NewValue/100.0;
+            //Force redraw of the buffer
+            canvasBuffer = null;
+
+            _quality = e.NewValue / 100.0;
 
             if (lblQuality != null)
-                lblQuality.Content = string.Format("{0:n0}%", _quality*100.0);
+                lblQuality.Content = string.Format("{0:n0}%", _quality * 100.0);
         }
 
         private void contrastSlider_ValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
         {
-            if (_comparer != null)
-            {
-                _comparer.ShadeRadius = (int) e.NewValue;
+            if (_renderer != null)
+                _renderer.ShadeRadius = (int)e.NewValue;
 
-                if (lblContrast != null)
-                {
-                    lblContrast.Content = _comparer.ShadeRadius + "X";
-                }
+            if (lblContrast != null)
+            {
+                lblContrast.Content = _renderer.ShadeRadius + "X";
             }
         }
 
         private void btnSaveActivity_Click(object sender, RoutedEventArgs e)
         {
-            new Thread(SaveCSV) {IsBackground = true}.Start(txtFileName.Text);
+            new Thread(SaveCSV) { IsBackground = true }.Start(txtFileName.Text);
         }
 
         private void SaveCSV(object videoFileName)
@@ -472,9 +492,9 @@ namespace SwarmSight
 
                     Dispatcher.InvokeAsync(() => { btnSaveActivity.Content = "Save Activity Data"; });
                 })
-                {
-                    IsBackground = true
-                }
+            {
+                IsBackground = true
+            }
                 .Start();
         }
 
@@ -503,7 +523,7 @@ namespace SwarmSight
         {
             if (roi.Visibility == Visibility.Visible)
             {
-                _comparer.SetBounds(roi.LeftPercent, roi.TopPercent, roi.RightPercent, roi.BottomPercent);
+                ((MotionDetector)_processor).SetBounds(roi.LeftPercent, roi.TopPercent, roi.RightPercent, roi.BottomPercent);
 
                 txtLeft.Text = roi.LeftPercent.ToString("P2");
                 txtRight.Text = roi.RightPercent.ToString("P2");
@@ -513,7 +533,7 @@ namespace SwarmSight
 
             else
             {
-                _comparer.SetBounds(0, 0, 1, 1);
+                ((MotionDetector)_processor).SetBounds(0, 0, 1, 1);
 
                 txtLeft.Text = 0.ToString("P2");
                 txtRight.Text = 0.ToString("P2");

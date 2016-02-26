@@ -15,6 +15,10 @@ namespace SwarmSight.UserControls
     /// </summary>
     public partial class VideoActivityChart : UserControl
     {
+        private List<Point> _activity;
+        private ChartModel _chart;
+        public EventHandler<EventArgs> UseCurrentClicked;
+        public EventHandler<EventArgs> SelectionChanged;
         public List<Point> Activity
         {
             get
@@ -58,13 +62,6 @@ namespace SwarmSight.UserControls
                 return (selectionX - chartBeginX)/chartWidth;
             }
         }
-
-        private List<Point> _activity;
-
-        private ChartModel _chart;
-
-        public EventHandler<EventArgs> UseCurrentClicked;
-        public EventHandler<EventArgs> SelectionChanged;
 
         public VideoActivityChart()
         {

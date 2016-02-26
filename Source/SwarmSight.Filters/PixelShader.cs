@@ -1,4 +1,4 @@
-﻿using SwarmSight.VideoPlayer;
+﻿using SwarmSight.Filters;
 using System;
 using System.Collections.Generic;
 using System.Drawing;

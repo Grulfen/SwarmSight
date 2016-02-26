@@ -1,4 +1,5 @@
-﻿using SwarmSight.VideoPlayer;
+﻿using SwarmSight.Filters;
+using SwarmSight.VideoPlayer;
 
 namespace Classes
 {

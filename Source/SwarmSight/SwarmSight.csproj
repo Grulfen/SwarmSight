@@ -16,7 +16,7 @@
     <TargetFrameworkProfile>
     </TargetFrameworkProfile>
     <IsWebBootstrapper>false</IsWebBootstrapper>
-    <ApplicationReSight>3</ApplicationReSight>
+    <ApplicationRevision>3</ApplicationRevision>
     <PublishUrl>Y:\Documents\Dropbox\Research\Chris Jernigan\SwarmSight\Setup\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -75,11 +75,11 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="OxyPlot">
-      <HintPath>packages\OxyPlot.2014.1.546\lib\OxyPlot.dll</HintPath>
+      <HintPath>..\SwarmSight.Stats\OxyPlot.dll</HintPath>
     </Reference>
     <Reference Include="OxyPlot.Wpf, Version=2014.1.546.0, Culture=neutral, PublicKeyToken=75e952ba404cdbb0, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
-      <HintPath>packages\OxyPlot.2014.1.546\lib\net45\OxyPlot.Wpf.dll</HintPath>
+      <HintPath>..\SwarmSight.Stats\OxyPlot.Wpf.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Drawing" />
@@ -203,6 +203,14 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\SwarmSight.Filters\SwarmSight.Filters.csproj">
+      <Project>{FB2B2220-9B5D-4BB2-B41C-7D19854FFA78}</Project>
+      <Name>SwarmSight.Filters</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\SwarmSight.MotionTracking\SwarmSight.MotionTracking.csproj">
+      <Project>{15abadd1-a340-442b-af36-9e399ff2f9f1}</Project>
+      <Name>SwarmSight.MotionTracking</Name>
+    </ProjectReference>
     <ProjectReference Include="..\SwarmSight.Stats\SwarmSight.Stats.csproj">
       <Project>{d5640fc6-0344-43af-a30b-59f2c30d1a18}</Project>
       <Name>SwarmSight.Stats</Name>

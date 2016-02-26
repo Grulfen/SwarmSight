@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Threading;
 using OxyPlot;
 using OxyPlot.Axes;
@@ -23,10 +24,11 @@ namespace SwarmSight.Stats
                     PlotAreaBorderThickness = new OxyThickness(0),
                 };
 
-            _series = new LineSeries("Changed Pixels")
+            _series = new LineSeries()
                 {
                     Color = OxyColor.FromRgb(0, 0, 0),
                     StrokeThickness = 0.5,
+                Title = "Changed Pixels"
                 };
 
             _Xaxis = new LinearAxis()
@@ -49,6 +51,19 @@ namespace SwarmSight.Stats
             MyModel.Axes.Add(_Xaxis);
             MyModel.Axes.Add(logAxis);
 
+            MyModel.Updated += (sender, args) =>
+            {
+                lock (_pointBuffer)
+                {
+                    foreach (var pt in _pointBuffer)
+                    {
+                        _series.Points.Add(pt);
+                    }
+
+                    _pointBuffer.Clear();
+                }
+            };
+
             this.MyModel.Series.Add(_series);
         }
 
@@ -67,9 +82,13 @@ namespace SwarmSight.Stats
 
         private static object lockpad = new object();
 
+        private readonly List<DataPoint> _pointBuffer = new List<DataPoint>();
         public void AddPoint(int x, int y)
         {
-            _series.Points.Add(new DataPoint(x, y));
+            lock (_pointBuffer)
+            {
+                _pointBuffer.Add(new DataPoint(x, y));
+            }
 
             if (queueMonitor != null)
                 return;
@@ -83,7 +102,7 @@ namespace SwarmSight.Stats
                     {
                         while (KeepRefreshing)
                         {
-                            Thread.Sleep(500);
+                        Thread.Sleep(150);
 
                             MyModel.InvalidatePlot(true);
                         }

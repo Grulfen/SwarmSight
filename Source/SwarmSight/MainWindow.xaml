@@ -40,7 +40,7 @@
         <Slider x:Name="sliderTime" HorizontalAlignment="Left" Margin="24,345,0,0" VerticalAlignment="Top" Width="511"
                 Height="22" ValueChanged="timeSlider_ValueChanged" Maximum="1000" LargeChange="10" SmallChange="1"
                 TickFrequency="100" ToolTip="Slide to the desired location in the video"
-                MouseDown="sliderTime_MouseDown" MouseUp="sliderTime_MouseUp" PreviewMouseDown="sliderTime_PreviewMouseDown" PreviewMouseUp="sliderTime_PreviewMouseUp" />
+                MouseDown="sliderTime_MouseDown" PreviewMouseDown="sliderTime_PreviewMouseDown" />
         <Label x:Name="lblChangedPixels" Content="Changed Pixels: 0" HorizontalAlignment="Left" Margin="20,421,0,0"
                VerticalAlignment="Top" Width="148" HorizontalContentAlignment="Right" VerticalContentAlignment="Center"
                ToolTip="Number of pixels that changed in the most recently shown frame" Background="#7FFFFFFF" />
@@ -65,12 +65,12 @@
                 ToolTip="Restrict the motion detection to a desired region. The region size can be adjusted." />
         <Label Content="Speed" HorizontalAlignment="Left" Margin="545,220,0,0" VerticalAlignment="Top" />
         <Slider x:Name="sliderQuality" HorizontalAlignment="Left" Margin="547,259,0,0" VerticalAlignment="Top"
-                Width="153" Maximum="100" Minimum="25" SmallChange="25" Value="25"
+                Width="153" Maximum="100" Minimum="25" SmallChange="25" Value="100"
                 ValueChanged="sliderQuality_ValueChanged" IsSnapToTickEnabled="True" LargeChange="25"
                 TickFrequency="25"
                 ToolTip="Adjust the scale used for rendering frames. Smaller scale is faster, larger scale is more accurate." />
         <Label Content="Accuracy" HorizontalAlignment="Left" Margin="643,220,0,0" VerticalAlignment="Top" />
-        <Label x:Name="lblQuality" Content="25%" HorizontalAlignment="Left" Margin="593,220,0,0"
+        <Label x:Name="lblQuality" Content="100%" HorizontalAlignment="Left" Margin="593,220,0,0"
                VerticalAlignment="Top" Width="50" HorizontalContentAlignment="Center"
                ToolTip="The scale used for rendering video frames. Smaller scale improves performance." />
         <Label Content="Activity Settings" HorizontalAlignment="Left" Margin="547,8,0,0" VerticalAlignment="Top"
